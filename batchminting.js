@@ -140,9 +140,9 @@ const batchmint = async (_tokencount) => {
          marker: nfts.result.marker,
        });
       //  results += "\n" + JSON.stringify(nfts, null, 2);
-      console.table(nfts;
+      console.table(nfts.result.account_nfts);
     }
-    console.table(nfts.result.account_nfts);
+    // console.table(nfts.result.account_nfts);
       client.disconnect();
   //     }
   //    catch (e) {
