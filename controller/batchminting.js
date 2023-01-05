@@ -2,13 +2,16 @@ const { XummSdk } = require("xumm-sdk");
 const xrpl = require("xrpl");
 require("dotenv").config();
 const Sdk = new XummSdk(process.env.API_KEY, process.env.API_SECRET);
-const prompt = require("prompt-sync")({ sigint: true });
+// const prompt = require("prompt-sync")({ sigint: true });
+
+const seller_wallet = xrpl.Wallet.fromSecret(process.env.SELLER_SEED);
+const broker_wallet = xrpl.Wallet.fromSecret(process.env.TRESURE_SEED);
+
+const client = new xrpl.Client(process.env.DEV_NET_NODE);
 
 const main = async () => {
-  const nub = Number(prompt("Enter number of copies :"));
-  const taxon = Number(prompt("Enter taxon number :"));
-
-
+  let nub 
+  let taxon  
   let change = [];
 
   if (nub % 200) {
@@ -25,27 +28,25 @@ const main = async () => {
     }
   }
 
+  // await Promise.all(
+  //   change.map(async (nftokenCount) =>)
+  // );
+
   for (let index = 0; index < change.length; index++) {
     console.log("details", change[index], index);
     let nftokenCount = change[index];
-
     await batchmint(nftokenCount, taxon);
-   
   }
 };
 
-const batchmint = async (_tokencount,taxon) => {
-  try {
+const batchmint = async (_tokencount, taxon) => {
+  // try {
   let results;
+  await client.connect();
   // Connecting with the application which we made on developer console--
   const appInfo = await Sdk.ping();
   console.log(appInfo.application.name);
 
-  const seller_wallet = xrpl.Wallet.fromSecret(process.env.SELLER_SEED);
-  const broker_wallet = xrpl.Wallet.fromSecret(process.env.TRESURE_SEED);
-
-  const client = new xrpl.Client(process.env.DEV_NET_NODE);
-  await client.connect();
   var txArray = [];
 
   console.log("Accountset");
@@ -69,7 +70,7 @@ const batchmint = async (_tokencount,taxon) => {
   //-------------------------------------------- Create the transaction hash.
   const ticketTransaction = await client.autofill({
     TransactionType: "TicketCreate",
-    Account: broker_wallet.address,
+    Account: broker_wallet.classicAddress,
     TicketCount: nftokenCount,
     Sequence: my_sequence,
   });
@@ -80,30 +81,115 @@ const batchmint = async (_tokencount,taxon) => {
 
   //-------------------------- Submit the transaction and wait for the result.
   const tx = await client.submitAndWait(signedTransaction.tx_blob);
-  // console.log("Signed ticket", tx);
+  // console.log("Broker", broker_wallet);
+
+  let tickets = [];
 
   let response = await client.request({
     command: "account_objects",
-    account: broker_wallet.address,
+    account: broker_wallet.classicAddress,
     type: "ticket",
-    limit: 400,
   });
-  // console.table(response.result.account_objects);
+
+  // console.log("response_initial", response);
+
+  tickets = await new Promise((resolve, reject) => {
+    try {
+      // let objects = [];
+      // const listing = response.result.account_objects;
+      // for (let index = 0; index < listing.length; index++) {
+      //   const element = listing["TicketSequence"];
+      //   if (!element) {
+      //     return;
+      //   }
+      //   objects.push(element);
+      // }
+      const objects = response.result.account_objects.map(
+        (item) => item["TicketSequence"]
+      );
+      resolve(objects);
+    } catch (error) {
+      console.log(error);
+      reject([]);
+    }
+  });
+
+  if (response.result.marker) {
+    // let _marker = response.result.marker.split(",");
+    // console.log("Marker", _marker);
+    while (response.result.marker) {
+      response = await client.request({
+        command: "account_objects",
+        account: broker_wallet.classicAddress,
+        type: "ticket",
+        limit: 200,
+        marker: response.result.marker,
+      });
+      // console.log("response", response);
+      // console.table(response.result.account_objects);
+
+      tickets = [
+        ...tickets,
+        ...(await new Promise((resolve, reject) => {
+          try {
+            const objects = response.result.account_objects.map(
+              (item) => item["TicketSequence"]
+            );
+            // console.table(response.result.account_objects);
+            console.log("Tickets generated");
+            console.table(tickets);
+            resolve(objects);
+          } catch (error) {
+            console.log(error);
+            reject([]);
+          }
+        })),
+      ];
+    }
+  }
+  // console.log(response);
+  // let account_objects = response.result.account_objects;
 
   //------------------------------------ Populate the tickets array variable.
-  let tickets = [];
-
-  for (let i = 0; i < nftokenCount; i++) {
-    tickets[i] = response.result.account_objects[i].TicketSequence;
-  }
 
   //-------------------------------------------------------- Report progress.
-
   console.log("Tickets generated");
   console.table(tickets);
 
   // ###################################
   // Mint NFTokens
+
+  // const CVhange = Array(nftokenCount).fill();
+
+  // let transactionBlob1 = {
+  //   TransactionType: "NFTokenMint",
+  //   Account: broker_wallet.classicAddress,
+  //   URI: xrpl.convertStringToHex("Helllo"),
+  //   Flags: parseInt("9"),
+  //   TransferFee: parseInt("314"),
+  //   Sequence: 0,
+  //   Issuer: seller_wallet.classicAddress,
+  //   LastLedgerSequence: null,
+  //   NFTokenTaxon: taxon,
+  //   Fee: "10",
+  // };
+  // transactionBlob1.Memos = [
+  //   {
+  //     Memo: {
+  //       MemoData: xrpl.convertStringToHex("Buddies"),
+  //     },
+  //   },
+  // ];
+
+  // const values = await Promise.all(
+  //   CVhange.map(async (value, key) => {
+  //     transactionBlob1.TicketSequence = key + 1;
+  //     //------------------------------------------------------ Submit signed blob.
+  //     return await client.submit(transactionBlob1, {
+  //       wallet: broker_wallet,
+  //     });
+  //   })
+  // );
 
   for (let i = 0; i < nftokenCount; i++) {
     const transactionBlob = {
@@ -128,17 +214,19 @@ const batchmint = async (_tokencount,taxon) => {
       },
     ];
     const tx = await client.submit(transactionBlob, { wallet: broker_wallet });
+    // console.log("Transactioon", tx.result.tx_json.LastLedgerSequence);
     txArray.push({
       txHash: tx.result.tx_json.hash,
       issuer: tx.result.tx_json.Issuer,
     });
   }
+  //
+  console.log("Transactions");
+  console.log(txArray);
+  // setTimeout(async () => {
+  //   createSellOffer(txArray);
+  // }, 5000);
 
-  console.log("Transactions",);
-  console.table(txArray);
-    setTimeout(async () => {
-        createSellOffer(txArray);
-    }, 5000);
   // let nfts = await client.request({
   //   method: "account_nfts",
   //   account: broker_wallet.classicAddress,
@@ -157,12 +245,13 @@ const batchmint = async (_tokencount,taxon) => {
   // }
   // console.table(nfts.result.account_nfts);
   // client.disconnect();
-      }
-     catch (e) {
-    console.log("eeee::: ", e);
-  }
+  //     }
+  //    catch (e) {
+  //   console.log("eeee::: ", e);
+  // }
 };
-main();
+
+// main();
 // batchmint(112);
 
 const getbatch = async () => {
@@ -171,36 +260,15 @@ const getbatch = async () => {
   const client = new xrpl.Client(process.env.DEV_NET_NODE);
   await client.connect();
 
-  // let account_tx = await client.request({
-  //   id: 2,
-  //   command: "account_tx",
-  //   account: broker_wallet.classicAddress,
-  //   ledger_index_min: -1,
-  //   ledger_index_max: -1,
-  //   binary: false,
-  //   limit: 400,
-  //   forward: false,
-  //   ledger_index: "validated",
-  // });
-  // console.log("account_tx.result.marker: ", account_tx);
-  // console.table(account_tx.result.transactions);
-  // account_tx.result.transactions.map((e) => {
-  //   console.log(e);
-  //   //  e.map((p)=> {console.log(`\n\n${p}`);})
-  // });
-
-
-   let nfts = await client.request({
-     method: "account_nfts",
-     account: broker_wallet.classicAddress,
-     limit: 400,
-   });
-   console.log("lav", nfts);
+  let nfts = await client.request({
+    method: "account_nfts",
+    account: broker_wallet.classicAddress,
+    limit: 400,
+  });
+  console.log("lav", nfts);
 };
 
 // getbatch();
-
-
 
 const createSellOffer = async (txArray) => {
   // try {
@@ -209,31 +277,33 @@ const createSellOffer = async (txArray) => {
   console.log("Connected to NFT dev net for create sell offer..");
   const broker_wallet = xrpl.Wallet.fromSecret(process.env.TRESURE_SEED);
 
-     var nftids = []
-     let selloffers = [];
+  var nftids = [];
+  let selloffers = [];
+  console.log("****************************");
+  console.table(txArray);
+  console.log("****************************");
+  for (let index = 0; index < txArray.length; index++) {
+    let nfttokenId = await getToken(client, txArray[index].txHash);
+    // console.log("TokenID\n\n ", nfttokenId);
+    nftids.push({ txhash: txArray[index].txHash, tokenId: nfttokenId });
+  }
+  console.table(nftids);
+  return;
 
+  for (let index = 0; index < txArray.length; index++) {
+    console.log("hash:", txArray[index].txHash);
 
-     for (let index = 0; index < txArray.length; index++) {
-      // console.log("hash:",txArray[index].txHash)
-      let nfttokenId =await getToken(client, txArray[index].txHash);
-      // console.log("TokenID\n\n ", nfttokenId);
-      nftids.push(nfttokenId);
-    
     // console.log('\n\nNFT Tokenids')
     // console.table(nftids);
-    
 
     let transactionBlob = {};
     let nftSellOffers = {};
     let offerIndex = "";
 
-
-    // for (let i = 0; i < nftids.length; i++) {
-    // console.log("Inside for loop");
     transactionBlob = {
       TransactionType: "NFTokenCreateOffer",
       Account: broker_wallet.classicAddress,
-      NFTokenID: await getToken(client, txArray[index].txHash),
+      NFTokenID: nftids[index],
       Amount: "0",
       Flags: 1, // 1 => sell offer
     };
@@ -248,29 +318,28 @@ const createSellOffer = async (txArray) => {
     });
 
     selloffers.push(nftSellOffers);
-   
-     if (nftSellOffers.result && nftSellOffers.result.offers.length) {
-       offerIndex =
-         nftSellOffers.result.offers[nftSellOffers.result.offers.length - 1][
-           "nft_offer_index"
-         ];
-       //offerIndex = nftSellOffers.result.offers[0]['nft_offer_index'];
-     }
 
-     if (nftSellOffers.result && nftSellOffers.result.offers.length) {
-       nftSellOffers.result.offers.forEach((offer) => {
-         offerIndex = offer.nft_offer_index;
-       });
-     }
+    // if (nftSellOffers.result && nftSellOffers.result.offers.length) {
+    //   offerIndex =
+    //     nftSellOffers.result.offers[nftSellOffers.result.offers.length - 1][
+    //       "nft_offer_index"
+    //     ];
+    //   //offerIndex = nftSellOffers.result.offers[0]['nft_offer_index'];
+    // }
+
+    // if (nftSellOffers.result && nftSellOffers.result.offers.length) {
+    //   nftSellOffers.result.offers.forEach((offer) => {
+    //     offerIndex = offer.nft_offer_index;
+    //   });
+    // }
   }
   console.log("\n\nSelloffers");
- console.table(selloffers);
- client.disconnect();
+  console.table(selloffers);
+  client.disconnect();
 };
 
-
 const getToken = async (client, transaction) => {
-  // console.log("Getting NFTtoken IDs")
+  // console.log("trans====", transaction);
   let nfts = await client.request({
     method: "tx",
     transaction: transaction,
@@ -288,7 +357,7 @@ const getToken = async (client, transaction) => {
           n.CreatedNode?.NewFields?.NFTokens ||
           n.ModifiedNode?.FinalFields?.NFTokens
       );
-        // console.log("node", node);
+      // console.log("node", node);
 
       let nftResult = {};
 
@@ -321,7 +390,7 @@ const getToken = async (client, transaction) => {
           token = nftResult[0]?.NFTokenID;
         }
       }
-
+      console.log(`Token ==> ${token}  Hash ==> ${transaction}`);
       resolve(token);
     } catch (error) {
       reject(error);
@@ -333,3 +402,31 @@ const getToken = async (client, transaction) => {
       return false;
     });
 };
+
+const getTickets = async (account_object) => {
+  setTimeout(() => {
+    nftids.push({ txhash: txArray[index].txHash, tokenId: nfttokenId });
+  }, 1000);
+};
+
+const account_info = async (req, res) => {
+  //   console.log(xrpl);
+  // const client = new xrpl.Client(process.env.DEV_NET_NODE);
+  try {
+    const account_info = await client.request({
+      command: "account_info",
+      account: broker_wallet.address,
+    });
+    console.log("Done\n", account_info);
+    my_sequence = account_info.result.account_data.Sequence;
+    console.log(my_sequence);
+    res.send({
+      data: my_sequence,
+      status: true,
+    });
+  } catch (error) {
+    res.send(error);
+  }
+};
+
+module.exports = {account_info}
