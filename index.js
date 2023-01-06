@@ -11,5 +11,7 @@ app.get("/", (req, res) => {
 });
 
 app.listen(4000, () => {
-  console.log("hello");
+  console.log(
+    "GHODE JAISE SHAKTI ... GHODE JAISE DUM \nNAHI RUKENGE HUM ....NAHI RUKENGE HUM ;)"
+  );
 });

@@ -9,9 +9,9 @@ const broker_wallet = xrpl.Wallet.fromSecret(process.env.TRESURE_SEED);
 
 const client = new xrpl.Client(process.env.DEV_NET_NODE);
 
-const main = async () => {
-  let nub 
-  let taxon  
+const main = async (req, res) => {
+  console.log(req.body);
+  let { nub, taxon } = req.body;
   let change = [];
 
   if (nub % 200) {
@@ -31,17 +31,28 @@ const main = async () => {
   // await Promise.all(
   //   change.map(async (nftokenCount) =>)
   // );
-
+let txarray = [];
   for (let index = 0; index < change.length; index++) {
     console.log("details", change[index], index);
     let nftokenCount = change[index];
-    await batchmint(nftokenCount, taxon);
+    txarray = [...txarray, ...(await batchmint(nftokenCount, taxon))];
   }
+  if(txarray){
+  res.status(200).send({
+    data:txarray,
+    status:true
+  })
+}else{
+  res.status(404).send({
+    data: null,
+    status: false,
+  });
+}
+
 };
 
 const batchmint = async (_tokencount, taxon) => {
   // try {
-  let results;
   await client.connect();
   // Connecting with the application which we made on developer console--
   const appInfo = await Sdk.ping();
@@ -62,9 +73,10 @@ const batchmint = async (_tokencount, taxon) => {
 
   const account_info = await client.request({
     command: "account_info",
-    account: broker_wallet.address,
+    account: broker_wallet.classicAddress,
   });
   my_sequence = account_info.result.account_data.Sequence;
+  
   const nftokenCount = parseInt(_tokencount);
 
   //-------------------------------------------- Create the transaction hash.
@@ -137,7 +149,7 @@ const batchmint = async (_tokencount, taxon) => {
             );
             // console.table(response.result.account_objects);
             console.log("Tickets generated");
-            console.table(tickets);
+            console.table(objects);
             resolve(objects);
           } catch (error) {
             console.log(error);
@@ -223,6 +235,7 @@ const batchmint = async (_tokencount, taxon) => {
   //
   console.log("Transactions");
   console.log(txArray);
+  return txArray;
   // setTimeout(async () => {
   //   createSellOffer(txArray);
   // }, 5000);
@@ -410,14 +423,13 @@ const getTickets = async (account_object) => {
 };
 
 const account_info = async (req, res) => {
-  //   console.log(xrpl);
-  // const client = new xrpl.Client(process.env.DEV_NET_NODE);
   try {
+    await client.connect();
     const account_info = await client.request({
       command: "account_info",
-      account: broker_wallet.address,
+      account: broker_wallet.classicAddress,
     });
-    console.log("Done\n", account_info);
+    // console.log("Done\n", account_info);
     my_sequence = account_info.result.account_data.Sequence;
     console.log(my_sequence);
     res.send({
@@ -429,4 +441,6 @@ const account_info = async (req, res) => {
   }
 };
 
-module.exports = {account_info}
+// account_info()
+
+module.exports = { account_info, main };
