@@ -11,7 +11,5 @@ app.get("/", (req, res) => {
 });
 
 app.listen(4000, () => {
-  console.log(
-    "GHODE JAISE SHAKTI ... GHODE JAISE DUM \nNAHI RUKENGE HUM ....NAHI RUKENGE HUM ;)"
-  );
+  console.log("Server connected ;)");
 });
