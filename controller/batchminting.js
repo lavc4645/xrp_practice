@@ -290,40 +290,47 @@ const createSellOffer = async (txArray) => {
   // console.table(txArray);
   // console.log("****************************");
   for (let index = 0; index < txArray.length; index++) {
-    let nfttokenId = await getToken(client, txArray[index].txHash);
-    // console.log("TokenID\n\n ", nfttokenId);
-    nftids.push({ txhash: txArray[index].txHash, tokenId: nfttokenId });
-    console.table(nftids);
-    }
-return
-    for (let index = 0; index < txArray.length; index++) {
+    const { txHash } = txArray[index];
+    console.log("txHash", txHash, index);
+    nftids.push({
+      txhash: txHash,
+      tokenId: await getToken(client, txHash),
+    });
+  }
+  console.table(nftids);
+  return;
+  for (let index = 0; index < txArray.length; index++) {
     let transactionBlob = {};
     let nftSellOffers = {};
     let offerIndex = "";
     let tx;
     selloffers = await gettxhash(broker_wallet, nfttokenId);
     console.log("Offer created", index);
-  
+
     // console.table(selloffers);
   }
 };
 
 const getToken = async (client, transaction) => {
   // console.log("trans====", transaction);
+
   let nfts = await client.request({
     method: "tx",
     transaction: transaction,
   });
+  // console.log("NFTS", nfts.result.meta.AffectedNodes);
+  // console.table(nfts);
 
-  return await new Promise((resolve, reject) => {
+  return await new Promise(async (resolve, reject) => {
     try {
-      let token = "";
+      let token;
 
       const node = nfts?.result?.meta?.AffectedNodes.find(
         (n) =>
           n.CreatedNode?.NewFields?.NFTokens ||
           n.ModifiedNode?.FinalFields?.NFTokens
       );
+      console.log("node", node);
       let nftResult = {};
 
       if (node) {
@@ -340,22 +347,46 @@ const getToken = async (client, transaction) => {
             (token) => token?.NFToken
           );
 
+          console.table(tokens);
+          console.table(prevTokens);
+
           if (prevTokens) {
+            nftResult = tokens.filter(
+              (t) => !prevTokens.some((pt) => pt.NFTokenID === t.NFTokenID)
+            );
+            console.log("abcd----", nftResult);
+          } else {
+            //logic to find previous tokens from nextminpage
+            console.log("xyz----", node);
+            nfts = await client.request({
+              method: "tx",
+              transaction: transaction,
+              NextPageMin: node.ModifiedNode?.PreviousFields.NextPageMin,
+            });
+            tokens = node.ModifiedNode?.FinalFields?.NFTokens?.map(
+              (token) => token?.NFToken
+            );
+
+            const prevTokens = node.ModifiedNode?.PreviousFields?.NFTokens?.map(
+              (token) => token?.NFToken
+            );
             nftResult = tokens.filter(
               (t) => !prevTokens.some((pt) => pt.NFTokenID === t.NFTokenID)
             );
           }
         } else {
           nftResult = tokens.map((token) => token);
+          console.log("abcd else----", nftResult);
         }
       }
-      // console.log("NFT----", nftResult);
+      console.log("NFT----", nftResult);
       if (nftResult && nftResult.length) {
         if (nftResult[0]?.NFTokenID) {
           token = nftResult[0]?.NFTokenID;
         }
       }
       // console.log(`Token ==> ${token}  Hash ==> ${transaction}`);
+      // have to wait the code
       resolve(token);
     } catch (error) {
       reject(error);
@@ -395,7 +426,7 @@ const account_info = async (req, res) => {
 
 const gettxhash = async (broker_wallet, tokenid) => {
   let nftSellOffers = {};
-  let selloffers = []
+  let selloffers = [];
   transactionBlob = {
     TransactionType: "NFTokenCreateOffer",
     Account: broker_wallet.classicAddress,
@@ -403,7 +434,9 @@ const gettxhash = async (broker_wallet, tokenid) => {
     Amount: "0",
     Flags: 1, // 1 => sell offer
   };
-  console.log("***************************************************************");
+  console.log(
+    "***************************************************************"
+  );
   console.table(transactionBlob);
   const tx = await client.submitAndWait(transactionBlob, {
     wallet: broker_wallet,
@@ -413,8 +446,8 @@ const gettxhash = async (broker_wallet, tokenid) => {
     nft_id: tokenid,
   });
   console.log("\n\nSelloffers");
-  console.log("*************************************************************")
-    selloffers.push(...nftSellOffers.result.offers);
+  console.log("*************************************************************");
+  selloffers.push(...nftSellOffers.result.offers);
 
   return selloffers;
 };
