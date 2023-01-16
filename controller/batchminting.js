@@ -52,10 +52,13 @@ const main = async (req, res) => {
 
 const batchmint = async (_tokencount, taxon) => {
   // try {
+    client.timeout = 180000
   await client.connect();
   // Connecting with the application which we made on developer console--
   const appInfo = await Sdk.ping();
-  console.log(appInfo.application.name);
+  console.log(appInfo.application.name, broker_wallet);
+  const bal = await client.getXrpBalance(broker_wallet.classicAddress);
+  console.log(bal);
 
   var txArray = [];
 
@@ -90,175 +93,157 @@ const batchmint = async (_tokencount, taxon) => {
 
   //-------------------------- Submit the transaction and wait for the result.
   const tx = await client.submitAndWait(signedTransaction.tx_blob);
-  // console.log("Broker", broker_wallet);
+  console.log("Tickets", tx);
 
+  
   let tickets = [];
-
+  
   let response = await client.request({
     command: "account_objects",
     account: broker_wallet.classicAddress,
     type: "ticket",
+    limit: 400
   });
-
-  // console.log("response_initial", response);
-
+  
+  // console.log("response_initial",response.result);
+  // console.table(response.result.account_objects);
   tickets = await new Promise((resolve, reject) => {
     try {
       // let objects = [];
       // const listing = response.result.account_objects;
       // for (let index = 0; index < listing.length; index++) {
-      //   const element = listing["TicketSequence"];
-      //   if (!element) {
-      //     return;
-      //   }
-      //   objects.push(element);
-      // }
-      const objects = response.result.account_objects.map(
-        (item) => item["TicketSequence"]
-      );
-      resolve(objects);
-    } catch (error) {
-      console.log(error);
-      reject([]);
-    }
-  });
-
-  if (response.result.marker) {
-    // let _marker = response.result.marker.split(",");
-    // console.log("Marker", _marker);
-    while (response.result.marker) {
-      response = await client.request({
-        command: "account_objects",
-        account: broker_wallet.classicAddress,
-        type: "ticket",
-        limit: 200,
-        marker: response.result.marker,
-      });
-      // console.log("response", response);
-      // console.table(response.result.account_objects);
-
-      tickets = [
-        ...tickets,
-        ...(await new Promise((resolve, reject) => {
-          try {
-            const objects = response.result.account_objects.map(
-              (item) => item["TicketSequence"]
+        //   const element = listing["TicketSequence"];
+        //   if (!element) {
+          //     return;
+          //   }
+          //   objects.push(element);
+          // }
+          const objects = response?.result?.account_objects?.map(
+            (item) => item["TicketSequence"]
             );
+            // console.log("Objects");
+            // console.table(objects); 
             resolve(objects);
           } catch (error) {
             console.log(error);
             reject([]);
           }
-        })),
-      ];
-    }
-  }
-  // console.log(response);
-  // let account_objects = response.result.account_objects;
+        });
+        
+        if (response.result.marker) {
+          // let _marker = response.result.marker.split(",");
+          // console.log("Marker", _marker);
+          while (response.result.marker) {
+            response = await client.request({
+              command: "account_objects",
+              account: broker_wallet.classicAddress,
+              type: "ticket", 
+              limit: 400,
+              marker: response.result.marker,
+            });
+            // console.log("response", response);
+            // console.table(response.result.account_objects);
+            
+            tickets = [
+              ...tickets,
+              ...(await new Promise((resolve, reject) => {
+                try {
+                  const objects = response.result.account_objects.map(
+                    (item) => item["TicketSequence"]
+                    );
+                    resolve(objects);
+                  } catch (error) {
+                    console.log(error);
+                    reject([]);
+                  }
+                })),
+              ];
+            }
+          }
+          // console.log(response);
+          // let account_objects = response.result.account_objects;
+          
+          //------------------------------------ Populate the tickets array variable.
+          
+          //-------------------------------------------------------- Report progress.
+          console.log("Tickets generated");
+          console.table(tickets);
+          
+          // ###################################
+          // Mint NFTokens
+          
+          // const CVhange = Array(nftokenCount).fill();
+          
+          // let transactionBlob1 = {
+            //   TransactionType: "NFTokenMint",
+            //   Account: broker_wallet.classicAddress,
+            //   URI: xrpl.convertStringToHex("Helllo"),
+            //   Flags: parseInt("9"),
+            //   TransferFee: parseInt("314"),
+            //   Sequence: 0,
+            //   Issuer: seller_wallet.classicAddress,
+            //   LastLedgerSequence: null,
+            //   NFTokenTaxon: taxon,
+            //   Fee: "10",
+            // };
+            // transactionBlob1.Memos = [
+              //   {
+                //     Memo: {
+                  //       MemoData: xrpl.convertStringToHex("Buddies"),
+                  //     },
+                  //   },
+                  // ];
+                  
+                  // const values = await Promise.all(
+                    //   CVhange.map(async (value, key) => {
+                      //     transactionBlob1.TicketSequence = key + 1;
+                      //     //------------------------------------------------------ Submit signed blob.
+                      //     return await client.submit(transactionBlob1, {
+                        //       wallet: broker_wallet,
+                        //     });
+                        //   })
+                        // );
 
-  //------------------------------------ Populate the tickets array variable.
+                        for (let i = 0; i < nftokenCount; i++) {
+                          const transactionBlob = {
+                            TransactionType: "NFTokenMint",
+                            Account: broker_wallet.classicAddress,
+                            URI: xrpl.convertStringToHex("Helllo"),
+                            Flags: parseInt("9"),
+                            TransferFee: parseInt("314"),
+                            Sequence: 0,
+                            Issuer: seller_wallet.classicAddress,
+                            TicketSequence: tickets[i],
+                            LastLedgerSequence: null,
+                            NFTokenTaxon: taxon,
+                            Fee: "10",
+                          };
+                          //------------------------------------------------------ Submit signed blob.
+                          transactionBlob.Memos = [
+                            {
+                              Memo: {
+                                MemoData: xrpl.convertStringToHex("Buddies"),
+                              },
+                            },
+                          ];
+                          const tx = await client.submit(transactionBlob, { wallet: broker_wallet });
+                          // console.log("Transactioon", tx.result.tx_json.LastLedgerSequence);
+                          txArray.push({
+                            txHash: tx.result.tx_json.hash,
+                            issuer: tx.result.tx_json.Issuer,
+                          });
+                        }
+                        //
+                        console.log("Transactions");
+                        console.table(txArray);
+                          await createSellOffer(txArray);
+                        
+                        
+                        return txArray;
 
-  //-------------------------------------------------------- Report progress.
-  // console.log("Tickets generated");
-  // console.table(tickets);
-
-  // ###################################
-  // Mint NFTokens
-
-  // const CVhange = Array(nftokenCount).fill();
-
-  // let transactionBlob1 = {
-  //   TransactionType: "NFTokenMint",
-  //   Account: broker_wallet.classicAddress,
-  //   URI: xrpl.convertStringToHex("Helllo"),
-  //   Flags: parseInt("9"),
-  //   TransferFee: parseInt("314"),
-  //   Sequence: 0,
-  //   Issuer: seller_wallet.classicAddress,
-  //   LastLedgerSequence: null,
-  //   NFTokenTaxon: taxon,
-  //   Fee: "10",
-  // };
-  // transactionBlob1.Memos = [
-  //   {
-  //     Memo: {
-  //       MemoData: xrpl.convertStringToHex("Buddies"),
-  //     },
-  //   },
-  // ];
-
-  // const values = await Promise.all(
-  //   CVhange.map(async (value, key) => {
-  //     transactionBlob1.TicketSequence = key + 1;
-  //     //------------------------------------------------------ Submit signed blob.
-  //     return await client.submit(transactionBlob1, {
-  //       wallet: broker_wallet,
-  //     });
-  //   })
-  // );
-
-  for (let i = 0; i < nftokenCount; i++) {
-    const transactionBlob = {
-      TransactionType: "NFTokenMint",
-      Account: broker_wallet.classicAddress,
-      URI: xrpl.convertStringToHex("Helllo"),
-      Flags: parseInt("9"),
-      TransferFee: parseInt("314"),
-      Sequence: 0,
-      Issuer: seller_wallet.classicAddress,
-      TicketSequence: tickets[i],
-      LastLedgerSequence: null,
-      NFTokenTaxon: taxon,
-      Fee: "10",
-    };
-    //------------------------------------------------------ Submit signed blob.
-    transactionBlob.Memos = [
-      {
-        Memo: {
-          MemoData: xrpl.convertStringToHex("Buddies"),
-        },
-      },
-    ];
-    const tx = await client.submit(transactionBlob, { wallet: broker_wallet });
-    // console.log("Transactioon", tx.result.tx_json.LastLedgerSequence);
-    txArray.push({
-      txHash: tx.result.tx_json.hash,
-      issuer: tx.result.tx_json.Issuer,
-    });
-  }
-  //
-  console.log("Transactions");
-  console.log(txArray);
-  setTimeout(async () => {
-    createSellOffer(txArray);
-  }, 5000);
-  return txArray;
-
-  // let nfts = await client.request({
-  //   method: "account_nfts",
-  //   account: broker_wallet.classicAddress,
-  //   limit: 400,
-  // });
-
-  // console.log("lav", nfts);
-  // while (nfts.result.marker) {
-  //   nfts = await client.request({
-  //     method: "account_nfts",
-  //     account: broker_wallet.classicAddress,
-  //     limit: 400,
-  //     marker: nfts.result.marker,
-  //   });
-  //   // console.table(nfts.result.account_nfts);
-  // }
-  // console.table(nfts.result.account_nfts);
-  // client.disconnect();
-  //     }
-  //    catch (e) {
-  //   console.log("eeee::: ", e);
-  // }
-};
-
-// main();
+                      };
+                      
+                      // main();
 // batchmint(112);
 
 const getbatch = async () => {
@@ -286,29 +271,23 @@ const createSellOffer = async (txArray) => {
 
   var nftids = [];
   let selloffers = [];
-  // console.log("****************************");
-  // console.table(txArray);
-  // console.log("****************************");
+ 
   for (let index = 0; index < txArray.length; index++) {
     const { txHash } = txArray[index];
-    console.log("txHash", txHash, index);
+    // console.log("txHash", txHash, index);
     nftids.push({
       txhash: txHash,
       tokenId: await getToken(client, txHash),
     });
   }
   console.table(nftids);
-  return;
-  for (let index = 0; index < txArray.length; index++) {
-    let transactionBlob = {};
-    let nftSellOffers = {};
-    let offerIndex = "";
-    let tx;
-    selloffers = await gettxhash(broker_wallet, nfttokenId);
+  for (let index = 0; index < nftids.length; index++) {
+   
+    selloffers = [...selloffers, ...await gettxhash(broker_wallet, nftids[index].tokenId)];
     console.log("Offer created", index);
-
-    // console.table(selloffers);
+    console.log("*************************************************************");
   }
+  console.table(selloffers);
 };
 
 const getToken = async (client, transaction) => {
@@ -330,7 +309,7 @@ const getToken = async (client, transaction) => {
           n.CreatedNode?.NewFields?.NFTokens ||
           n.ModifiedNode?.FinalFields?.NFTokens
       );
-      console.log("node", node);
+      // console.log("node", node);
       let nftResult = {};
 
       if (node) {
@@ -347,39 +326,40 @@ const getToken = async (client, transaction) => {
             (token) => token?.NFToken
           );
 
-          console.table(tokens);
-          console.table(prevTokens);
+          // console.table(tokens);
+          // console.table(prevTokens);
 
           if (prevTokens) {
             nftResult = tokens.filter(
               (t) => !prevTokens.some((pt) => pt.NFTokenID === t.NFTokenID)
             );
-            console.log("abcd----", nftResult);
+            // console.log("abcd----", nftResult);
           } else {
             //logic to find previous tokens from nextminpage
-            console.log("xyz----", node);
+            // console.log("xyz----", node);
             nfts = await client.request({
-              method: "tx",
-              transaction: transaction,
-              NextPageMin: node.ModifiedNode?.PreviousFields.NextPageMin,
+              command: "ledger_entry",
+              index: node.ModifiedNode?.PreviousFields?.NextPageMin,
+              ledger_index: "validated",
             });
             tokens = node.ModifiedNode?.FinalFields?.NFTokens?.map(
               (token) => token?.NFToken
             );
 
-            const prevTokens = node.ModifiedNode?.PreviousFields?.NFTokens?.map(
+            const prevTokens = nfts.result.node.NFTokens?.map(
               (token) => token?.NFToken
             );
             nftResult = tokens.filter(
               (t) => !prevTokens.some((pt) => pt.NFTokenID === t.NFTokenID)
             );
+            // console.log("Else part", nftResult);
           }
         } else {
           nftResult = tokens.map((token) => token);
-          console.log("abcd else----", nftResult);
+          // console.log("abcd else----", nftResult);
         }
       }
-      console.log("NFT----", nftResult);
+      // console.log("NFT----", nftResult);
       if (nftResult && nftResult.length) {
         if (nftResult[0]?.NFTokenID) {
           token = nftResult[0]?.NFTokenID;
@@ -435,9 +415,9 @@ const gettxhash = async (broker_wallet, tokenid) => {
     Flags: 1, // 1 => sell offer
   };
   console.log(
-    "***************************************************************"
+    // "***************************************************************"
   );
-  console.table(transactionBlob);
+  // console.table(transactionBlob);
   const tx = await client.submitAndWait(transactionBlob, {
     wallet: broker_wallet,
   });
@@ -445,13 +425,105 @@ const gettxhash = async (broker_wallet, tokenid) => {
     method: "nft_sell_offers",
     nft_id: tokenid,
   });
-  console.log("\n\nSelloffers");
-  console.log("*************************************************************");
+  // console.log("\n\nSelloffers");
+  
   selloffers.push(...nftSellOffers.result.offers);
 
   return selloffers;
 };
 
 // account_info()
+
+const transaction = async (txhash) => {
+  await client.connect();
+  let nfts = await client.request({
+    method: "tx",
+    transaction: txhash,
+  });
+
+  let token;
+
+  let node = nfts?.result?.meta?.AffectedNodes.find(
+    (n) =>
+      n.CreatedNode?.NewFields?.NFTokens ||
+      n.ModifiedNode?.FinalFields?.NFTokens
+  );
+  nfts = await client.request({
+    command: "ledger_entry",
+    index: node.ModifiedNode?.PreviousFields?.NextPageMin,
+    ledger_index: "validated",
+  });
+  console.log(
+    "node+++++++++++++",
+    node.ModifiedNode?.PreviousFields?.NextPageMin
+  );
+  console.table(nfts.result.node.NFTokens);
+
+
+  while (node.ModifiedNode?.PreviousFields?.NextPageMin) {
+    console.log("node2", nfts);
+    break;
+    node = nfts?.result?.meta?.AffectedNodes.find(
+      (n) =>
+        n.CreatedNode?.NewFields?.NFTokens ||
+        n.ModifiedNode?.FinalFields?.NFTokens
+    );
+  }
+  let nftResult = {};
+  if (node) {
+    let tokens = node.CreatedNode?.NewFields?.NFTokens?.map(
+      (token) => token?.NFToken
+    );
+
+    if (!tokens) {
+      tokens = node.ModifiedNode?.FinalFields?.NFTokens?.map(
+        (token) => token?.NFToken
+      );
+
+      const prevTokens = node.ModifiedNode?.PreviousFields?.NFTokens?.map(
+        (token) => token?.NFToken
+      );
+
+      console.table(tokens);
+      console.table(prevTokens);
+
+      if (prevTokens) {
+        nftResult = tokens.filter(
+          (t) => !prevTokens.some((pt) => pt.NFTokenID === t.NFTokenID)
+        );
+        console.log("abcd----", nftResult);
+      } else {
+        //logic to find previous tokens from nextminpage
+        console.log("xyz----", node);
+        nfts = await client.request({
+          method: "tx",
+          transaction: transaction,
+          NextPageMin: node.ModifiedNode?.PreviousFields.NextPageMin,
+        });
+        tokens = node.ModifiedNode?.FinalFields?.NFTokens?.map(
+          (token) => token?.NFToken
+        );
+
+        const prevTokens = node.ModifiedNode?.PreviousFields?.NFTokens?.map(
+          (token) => token?.NFToken
+        );
+        nftResult = tokens.filter(
+          (t) => !prevTokens.some((pt) => pt.NFTokenID === t.NFTokenID)
+        );
+      }
+    } else {
+      nftResult = tokens.map((token) => token);
+      console.log("abcd else----", nftResult);
+    }
+  }
+  console.log("NFT----", nftResult);
+  if (nftResult && nftResult.length) {
+    if (nftResult[0]?.NFTokenID) {
+      token = nftResult[0]?.NFTokenID;
+    }
+  }
+};
+
+// transaction("BC8ACE38FF2C234CC82FA708DB3590DE9D24CED2F1E2EF915277D0D13A6F7372");
 
 module.exports = { main };
