@@ -52,7 +52,7 @@ const main = async (req, res) => {
 
 const batchmint = async (_tokencount, taxon) => {
   // try {
-    client.connection.config.connectionTimeout = 18000
+    client.connection.config.connectionTimeout = 180000
     await client.connect();
     // client.timeout = 18000
   // Connecting with the application which we made on developer console--
