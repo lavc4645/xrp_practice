@@ -1,3 +1,5 @@
+/** Fund  Transfer for Batchminting in Treasure wallet */
+
 const {XummSdk} = require('xumm-sdk')
 const xrpl = require("xrpl");
 const Sdk = new XummSdk('5c9e4bd1-0f7a-4a7a-97c0-e2d7592a4e7d', 'd51f7b5f-d9da-4ffe-a06d-4a9e073171c0')
@@ -9,7 +11,7 @@ const main = async () => {
 
     const appInfo = await Sdk.ping()
     console.log(appInfo.application.name)
-const seller_wallet = xrpl.Wallet.fromSecret("sEdToZSYocvH9g24NESd8mZ4hgZirsx");
+const seller_wallet = xrpl.Wallet.fromSecret("sEd7hC8vnR1bnUyYhoyj4Ld3ZeYJv1H");
 
 const request = {
     "TransactionType": "Payment",
