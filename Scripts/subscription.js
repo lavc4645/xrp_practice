@@ -9,21 +9,21 @@ const main = async () => {
 
     const appInfo = await Sdk.ping()
     console.log(appInfo.application.name)
-    await client
-const seller_wallet = xrpl.Wallet.fromSecret("sEd7Cu4zuPGYzosNt6ZR3B2cs3Qg7gA");
+const seller_wallet = xrpl.Wallet.fromSecret("sEdToZSYocvH9g24NESd8mZ4hgZirsx");
 
-
-    const request = {
-        "TransactionType": "Payment",
-        "Account" : seller_wallet.classicAddress,
-        "Destination": "rJyc9swV3AmsJCAfKhWn98iymxtX9rrRH8",
-        "Amount": xrpl.xrpToDrops(950),
-        
-   
+const request = {
+    "TransactionType": "Payment",
+    "Account" : seller_wallet.classicAddress,
+    "Destination": "rJyc9swV3AmsJCAfKhWn98iymxtX9rrRH8",
+    "Amount": xrpl.xrpToDrops(988),
+    
+    
 }
 
 const Tx = await client.submit(request, { wallet: seller_wallet });
+const bal = await client.getXrpBalance(seller_wallet.classicAddress);
 console.log("Transactionn",Tx);
+console.log(bal);
 client.disconnect();
 
 // const subscription = await Sdk.payload.createAndSubscribe(request, event =>{

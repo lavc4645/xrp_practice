@@ -52,8 +52,9 @@ const main = async (req, res) => {
 
 const batchmint = async (_tokencount, taxon) => {
   // try {
-    client.timeout = 180000
-  await client.connect();
+    client.connection.config.connectionTimeout = 18000
+    await client.connect();
+    // client.timeout = 18000
   // Connecting with the application which we made on developer console--
   const appInfo = await Sdk.ping();
   console.log(appInfo.application.name, broker_wallet);
@@ -87,7 +88,7 @@ const batchmint = async (_tokencount, taxon) => {
     Sequence: my_sequence,
   });
 
-  // console.log("Ticket",ticketTransaction);
+  console.log("Ticket",ticketTransaction);
   //---------------------------------------------------- Sign the transaction.
   const signedTransaction = broker_wallet.sign(ticketTransaction);
 
@@ -160,39 +161,10 @@ const batchmint = async (_tokencount, taxon) => {
               ];
             }
           }
-          // console.log(response);
-          // let account_objects = response.result.account_objects;
-          
-          //------------------------------------ Populate the tickets array variable.
-          
-          //-------------------------------------------------------- Report progress.
+         
           console.log("Tickets generated");
           console.table(tickets);
           
-          // ###################################
-          // Mint NFTokens
-          
-          // const CVhange = Array(nftokenCount).fill();
-          
-          // let transactionBlob1 = {
-            //   TransactionType: "NFTokenMint",
-            //   Account: broker_wallet.classicAddress,
-            //   URI: xrpl.convertStringToHex("Helllo"),
-            //   Flags: parseInt("9"),
-            //   TransferFee: parseInt("314"),
-            //   Sequence: 0,
-            //   Issuer: seller_wallet.classicAddress,
-            //   LastLedgerSequence: null,
-            //   NFTokenTaxon: taxon,
-            //   Fee: "10",
-            // };
-            // transactionBlob1.Memos = [
-              //   {
-                //     Memo: {
-                  //       MemoData: xrpl.convertStringToHex("Buddies"),
-                  //     },
-                  //   },
-                  // ];
                   
                   // const values = await Promise.all(
                     //   CVhange.map(async (value, key) => {
@@ -236,9 +208,10 @@ const batchmint = async (_tokencount, taxon) => {
                         //
                         console.log("Transactions");
                         console.table(txArray);
+
                           await createSellOffer(txArray);
-                        
-                        
+                                            
+                        // await client.disconnect()
                         return txArray;
 
                       };
@@ -287,6 +260,12 @@ const createSellOffer = async (txArray) => {
     console.log("Offer created", index);
     console.log("*************************************************************");
   }
+  /** This will broke  the  websocket
+   * DisconnectedError: websocket was closed, Policy error: client is too slow.
+   */
+  // await Promise.all(nftids.map(async (nfttoken) => {
+  //   selloffers = [...selloffers, ...await gettxhash(broker_wallet, nfttoken.tokenId)];
+  // }))
   console.table(selloffers);
 };
 
@@ -421,6 +400,7 @@ const gettxhash = async (broker_wallet, tokenid) => {
   const tx = await client.submitAndWait(transactionBlob, {
     wallet: broker_wallet,
   });
+  // console.log("Transaction",tx)
   nftSellOffers = await client.request({
     method: "nft_sell_offers",
     nft_id: tokenid,
