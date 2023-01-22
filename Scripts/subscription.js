@@ -11,7 +11,7 @@ const main = async () => {
 
     const appInfo = await Sdk.ping()
     console.log(appInfo.application.name)
-const seller_wallet = xrpl.Wallet.fromSecret("sEd7hC8vnR1bnUyYhoyj4Ld3ZeYJv1H");
+const seller_wallet = xrpl.Wallet.fromSecret("sEd7mbggmnj1Qp82Pd3EWGqNqKedHb7");
 
 const request = {
     "TransactionType": "Payment",

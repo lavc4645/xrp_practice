@@ -258,7 +258,7 @@ const createSellOffer = async (txArray) => {
    
     selloffers = [...selloffers, ...await gettxhash(broker_wallet, nftids[index].tokenId)];
     console.log("Offer created", index);
-    console.log("*************************************************************");
+    // console.log("*************************************************************");
   }
   /** This will broke  the  websocket
    * DisconnectedError: websocket was closed, Policy error: client is too slow.
@@ -405,7 +405,7 @@ const gettxhash = async (broker_wallet, tokenid) => {
     method: "nft_sell_offers",
     nft_id: tokenid,
   });
-  // console.log("\n\nSelloffers");
+  console.log(nftSellOffers.result.offers);
   
   selloffers.push(...nftSellOffers.result.offers);
 
